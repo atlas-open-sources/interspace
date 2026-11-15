@@ -76,8 +76,8 @@ tell application "Finder"
         set viewOptions to icon view options of container window
         set arrangement of viewOptions to not arranged
         set icon size of viewOptions to 112
-        -- The labels of Finder are black on a background picture, and the picture has its own
-        -- white ones. So the labels of Finder are as small as they can be.
+        -- The labels of Finder are black on a background picture and cannot be removed. They are as
+        -- small as they can be, and the picture is dark below them, so they do not show.
         set text size of viewOptions to 10
         set background picture of viewOptions to file ".background:background.tiff"
         set position of item "Interspace.app" of container window to {176, 176}

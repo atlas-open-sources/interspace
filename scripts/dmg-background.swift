@@ -17,8 +17,6 @@ enum Layout {
     static let applications = CGPoint(x: 464, y: 176)
     /// The middle of the label that Finder draws below an icon, at its smallest text size.
     static let finderLabelOffset: CGFloat = iconSize / 2 + 11
-    /// The middle of the white label that is part of the picture, below the label of Finder.
-    static let labelOffset: CGFloat = iconSize / 2 + 31
 }
 
 func color(_ hex: UInt32, _ alpha: CGFloat = 1) -> CGColor {
@@ -119,11 +117,13 @@ func drawBackground(_ context: CGContext, scale: CGFloat) {
 
     // The places of the two icons.
     for centre in [Layout.app, Layout.applications] {
-        let slot = CGRect(x: centre.x - 78, y: centre.y - 78, width: 156, height: 184)
+        let slot = CGRect(x: centre.x - 78, y: centre.y - 78, width: 156, height: 156)
         let shape = CGPath(roundedRect: slot, cornerWidth: 28, cornerHeight: 28, transform: nil)
         context.saveGState()
         context.addPath(shape)
-        // Dark, so the black label of Finder does not show on it. See `drawLabels`.
+        // Finder draws the labels of a window with a background picture in black, in the light and
+        // in the dark appearance, and has no setting to change or remove them. This place is dark,
+        // so the label below the icon does not show on it.
         context.setFillColor(color(0x030409, 0.94))
         context.fillPath()
         context.addPath(shape)
@@ -134,8 +134,6 @@ func drawBackground(_ context: CGContext, scale: CGFloat) {
         context.strokePath()
         context.restoreGState()
     }
-
-    drawLabels(context)
 
     // The arrow: the streak of light of the icon, on its side.
     let tail = Layout.app.x + 78 + 14
@@ -156,24 +154,6 @@ func drawBackground(_ context: CGContext, scale: CGFloat) {
     context.addPath(chevron); context.strokePath()
     context.addPath(chevron); context.strokePath()
     context.restoreGState()
-}
-
-/// Finder draws the labels of a window with a background picture in black, in the light and in the
-/// dark appearance, and has no setting for it. So the white labels are part of the picture. The labels
-/// of Finder stay, black on the dark place of each icon, where they do not show.
-func drawLabels(_ context: CGContext) {
-    let graphics = NSGraphicsContext(cgContext: context, flipped: true)
-    NSGraphicsContext.saveGraphicsState()
-    NSGraphicsContext.current = graphics
-    for (centre, name) in [(Layout.app, "Interspace"), (Layout.applications, "Applications")] {
-        let text = NSAttributedString(string: name, attributes: [
-            .font: NSFont.systemFont(ofSize: 13, weight: .medium),
-            .foregroundColor: NSColor(srgbRed: 0.93, green: 0.95, blue: 1, alpha: 0.95),
-        ])
-        let size = text.size()
-        text.draw(at: CGPoint(x: centre.x - size.width / 2, y: centre.y + Layout.labelOffset - size.height / 2))
-    }
-    NSGraphicsContext.restoreGraphicsState()
 }
 
 /// The icons and labels, about as Finder draws them. Only for the preview.
