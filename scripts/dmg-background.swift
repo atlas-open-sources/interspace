@@ -2,7 +2,7 @@
 // that points from the app to the Applications folder, in the colours of the app icon.
 //
 //   swift scripts/dmg-background.swift            writes Resources/dmg-background.tiff (1x and 2x)
-//   swift scripts/dmg-background.swift --preview  also writes build/dmg-preview-{light,dark}.png,
+//   swift scripts/dmg-background.swift --preview  also writes build/dmg-preview.png,
 //                                                 with the icons and labels where Finder puts them
 //
 // The numbers in `Layout` are also in scripts/dmg.sh. Change them in both.
@@ -15,8 +15,10 @@ enum Layout {
     /// The centres of the icons, from the top left of the window, as Finder counts.
     static let app = CGPoint(x: 176, y: 176)
     static let applications = CGPoint(x: 464, y: 176)
-    /// The middle of the label that Finder draws below an icon.
-    static let labelOffset: CGFloat = iconSize / 2 + 14
+    /// The middle of the label that Finder draws below an icon, at its smallest text size.
+    static let finderLabelOffset: CGFloat = iconSize / 2 + 11
+    /// The middle of the white label that is part of the picture, below the label of Finder.
+    static let labelOffset: CGFloat = iconSize / 2 + 31
 }
 
 func color(_ hex: UInt32, _ alpha: CGFloat = 1) -> CGColor {
@@ -117,11 +119,12 @@ func drawBackground(_ context: CGContext, scale: CGFloat) {
 
     // The places of the two icons.
     for centre in [Layout.app, Layout.applications] {
-        let slot = CGRect(x: centre.x - 78, y: centre.y - 80, width: 156, height: 176)
+        let slot = CGRect(x: centre.x - 78, y: centre.y - 78, width: 156, height: 184)
         let shape = CGPath(roundedRect: slot, cornerWidth: 28, cornerHeight: 28, transform: nil)
         context.saveGState()
         context.addPath(shape)
-        context.setFillColor(color(0x9fb0ff, 0.035))
+        // Dark, so the black label of Finder does not show on it. See `drawLabels`.
+        context.setFillColor(color(0x030409, 0.94))
         context.fillPath()
         context.addPath(shape)
         context.setStrokeColor(color(0x9fb0ff, 0.38))
@@ -131,6 +134,8 @@ func drawBackground(_ context: CGContext, scale: CGFloat) {
         context.strokePath()
         context.restoreGState()
     }
+
+    drawLabels(context)
 
     // The arrow: the streak of light of the icon, on its side.
     let tail = Layout.app.x + 78 + 14
@@ -153,6 +158,24 @@ func drawBackground(_ context: CGContext, scale: CGFloat) {
     context.restoreGState()
 }
 
+/// Finder draws the labels of a window with a background picture in black, in the light and in the
+/// dark appearance, and has no setting for it. So the white labels are part of the picture. The labels
+/// of Finder stay, black on the dark place of each icon, where they do not show.
+func drawLabels(_ context: CGContext) {
+    let graphics = NSGraphicsContext(cgContext: context, flipped: true)
+    NSGraphicsContext.saveGraphicsState()
+    NSGraphicsContext.current = graphics
+    for (centre, name) in [(Layout.app, "Interspace"), (Layout.applications, "Applications")] {
+        let text = NSAttributedString(string: name, attributes: [
+            .font: NSFont.systemFont(ofSize: 13, weight: .medium),
+            .foregroundColor: NSColor(srgbRed: 0.93, green: 0.95, blue: 1, alpha: 0.95),
+        ])
+        let size = text.size()
+        text.draw(at: CGPoint(x: centre.x - size.width / 2, y: centre.y + Layout.labelOffset - size.height / 2))
+    }
+    NSGraphicsContext.restoreGraphicsState()
+}
+
 /// The icons and labels, about as Finder draws them. Only for the preview.
 func drawFinderItems(_ context: CGContext, labelColor: NSColor, appIcon: NSImage) {
     let graphics = NSGraphicsContext(cgContext: context, flipped: true)
@@ -167,11 +190,11 @@ func drawFinderItems(_ context: CGContext, labelColor: NSColor, appIcon: NSImage
         let frame = CGRect(x: centre.x - half, y: centre.y - half, width: Layout.iconSize, height: Layout.iconSize)
         icon.draw(in: frame, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
         let text = NSAttributedString(string: name, attributes: [
-            .font: NSFont.systemFont(ofSize: 12),
+            .font: NSFont.systemFont(ofSize: 10),
             .foregroundColor: labelColor,
         ])
         let size = text.size()
-        text.draw(at: CGPoint(x: centre.x - size.width / 2, y: centre.y + Layout.labelOffset - size.height / 2))
+        text.draw(at: CGPoint(x: centre.x - size.width / 2, y: centre.y + Layout.finderLabelOffset - size.height / 2))
     }
     NSGraphicsContext.restoreGraphicsState()
 }
@@ -204,11 +227,9 @@ print("Wrote Resources/dmg-background.tiff")
 if CommandLine.arguments.contains("--preview") {
     let appIcon = NSImage(contentsOfFile: "\(root)/Resources/AppIcon.icns")!
     try? FileManager.default.createDirectory(atPath: "\(root)/build", withIntermediateDirectories: true)
-    for (name, labelColor) in [("light", NSColor.black), ("dark", NSColor.white)] {
-        let context = makeContext(scale: 2)
-        drawBackground(context, scale: 2)
-        drawFinderItems(context, labelColor: labelColor, appIcon: appIcon)
-        write(context, to: "\(root)/build/dmg-preview-\(name).png", scale: 2)
-    }
-    print("Wrote build/dmg-preview-light.png and build/dmg-preview-dark.png")
+    let context = makeContext(scale: 2)
+    drawBackground(context, scale: 2)
+    drawFinderItems(context, labelColor: .black, appIcon: appIcon)
+    write(context, to: "\(root)/build/dmg-preview.png", scale: 2)
+    print("Wrote build/dmg-preview.png")
 }
