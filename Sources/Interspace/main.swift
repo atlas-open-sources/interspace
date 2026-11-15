@@ -44,6 +44,39 @@ if CommandLine.arguments.contains("--diagnose") {
     exit(0)
 }
 
+#if DEBUG
+/// Only in a debug build, for a test of the update with no release and no window:
+/// `Interspace --test-check` asks GitHub for the newest release.
+/// `Interspace --test-install <dmg> <app> <version>` installs the app of the disk image over `<app>`,
+/// as if `<app>` had `<version>`.
+if CommandLine.arguments.contains("--test-check") {
+    Task {
+        do {
+            let release = try await UpdateInstaller.latestRelease()
+            print("release: \(release.map { "\($0.version) \($0.dmg)" } ?? "none"), this app: \(UpdateInstaller.currentVersion), a release build: \(UpdateInstaller.isReleaseBuild)")
+        } catch {
+            print("failed: \(error)")
+        }
+        exit(0)
+    }
+    dispatchMain()
+}
+if let index = CommandLine.arguments.firstIndex(of: "--test-install"), CommandLine.arguments.count > index + 3 {
+    let arguments = CommandLine.arguments
+    do {
+        try UpdateInstaller.install(
+            dmg: URL(fileURLWithPath: arguments[index + 1]),
+            over: URL(fileURLWithPath: arguments[index + 2]),
+            newerThan: arguments[index + 3]
+        )
+        print("installed")
+    } catch {
+        print("refused: \(error)")
+    }
+    exit(0)
+}
+#endif
+
 // Two instances would both post a swipe and switch two spaces.
 if let bundleID = Bundle.main.bundleIdentifier {
     let others = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)

@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private let settings = AppSettings.shared
     private let settingsWindow = SettingsWindowController()
+    private let updater = Updater()
     private var settingsObserver: AnyCancellable?
     private var hasAccessibility = false
     private var hasScreenRecording = false
@@ -36,6 +37,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         setUpStatusItem()
+        updater.relaunch = { [weak self] in
+            self?.relaunch()
+        }
 
         // Open at login is on by default. This runs one time, so a later choice in the menu stays.
         if !UserDefaults.standard.bool(forKey: Self.loginItemSetUpKey) {
@@ -231,6 +235,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let open = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
         open.target = self
         menu.addItem(open)
+
+        let update = actionItem(updater.menuTitle, #selector(checkForUpdates))
+        update.isEnabled = !updater.isBusy
+        menu.addItem(update)
         menu.addItem(.separator())
 
         let capture = actionItem("Capture All Spaces Again", #selector(captureSpaces))
@@ -328,6 +336,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
             self?.controller.captureAllSpaces(again: true)
         }
+    }
+
+    @objc private func checkForUpdates() {
+        updater.check()
     }
 
     @objc private func openSettings() {
