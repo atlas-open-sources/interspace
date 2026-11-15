@@ -74,8 +74,8 @@ final class TransitionController {
     private var cacheOrder: [UInt64] = []
     private var packing: Set<UInt64> = []
     private var unpacking: Set<UInt64> = []
-    private static let packQueue = DispatchQueue(label: "com.cnrad.interspace.pack", qos: .utility)
-    private static let unpackQueue = DispatchQueue(label: "com.cnrad.interspace.unpack", qos: .userInteractive)
+    private static let packQueue = DispatchQueue(label: "com.cnrad.interspace.pack", qos: .utility, autoreleaseFrequency: .workItem)
+    private static let unpackQueue = DispatchQueue(label: "com.cnrad.interspace.unpack", qos: .userInteractive, autoreleaseFrequency: .workItem)
     private var wallpapers: [CGDirectDisplayID: Snapshot] = [:]
     /// Counts the changes of the displays, so a picture made for the displays before a change is not kept.
     private var wallpaperGeneration = 0

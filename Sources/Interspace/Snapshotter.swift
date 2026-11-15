@@ -99,6 +99,13 @@ final class Snapshotter {
     /// Windows of this app that are on screen (the overlay).
     private var ownWindows: [SCWindow] = []
     private var waiters: [CGDirectDisplayID: [(Snapshot?) -> Void]] = [:]
+    /// The capture that runs for each display. A result with a different number is from a capture that
+    /// was given up, and it is ignored.
+    private var running: [CGDirectDisplayID: Int] = [:]
+    private var lastCaptureNumber = 0
+    /// A capture takes much less than 0.1 s. The capture service can stop answering, and then the
+    /// callers must not wait with no end.
+    private static let captureTimeout: Double = 2
 
     /// Loads the display and window lists. It is slow, so do it before the first swipe.
     func refreshDisplays(_ completion: (() -> Void)? = nil) {
@@ -129,41 +136,51 @@ final class Snapshotter {
             return
         }
         waiters[displayID] = [completion]
+        lastCaptureNumber += 1
+        let number = lastCaptureNumber
+        running[displayID] = number
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.captureTimeout) { [weak self] in
+            guard let self, self.running[displayID] == number else { return }
+            // The display and window lists can be the cause, so the next capture loads them again.
+            self.displays[displayID] = nil
+            self.finish(displayID, nil, number)
+        }
 
         if includeDock {
-            captureScreen(screen)
+            captureScreen(screen, number)
         } else {
             captureBelowDock(screen: screen) { [weak self] snapshot in
-                guard let self else { return }
+                guard let self, self.running[displayID] == number else { return }
                 if let snapshot {
-                    self.finish(displayID, snapshot)
+                    self.finish(displayID, snapshot, number)
                 } else {
-                    self.captureScreen(screen)
+                    self.captureScreen(screen, number)
                 }
             }
         }
     }
 
     /// The full screen, as it looks.
-    private func captureScreen(_ screen: NSScreen) {
+    private func captureScreen(_ screen: NSScreen, _ number: Int) {
         let displayID = screen.displayID
         let scale = screen.backingScaleFactor
         let islandFrame = Self.islandFrame(on: screen)
         if let display = displays[displayID] {
-            run(display: display, scale: scale, islandFrame: islandFrame)
+            run(display: display, scale: scale, islandFrame: islandFrame, number: number)
         } else {
             refreshDisplays { [weak self] in
                 guard let self else { return }
                 if let display = self.displays[displayID] {
-                    self.run(display: display, scale: scale, islandFrame: islandFrame)
+                    self.run(display: display, scale: scale, islandFrame: islandFrame, number: number)
                 } else {
-                    self.finish(displayID, nil)
+                    self.finish(displayID, nil, number)
                 }
             }
         }
     }
 
-    private func run(display: SCDisplay, scale: CGFloat, islandFrame: CGRect?) {
+    private func run(display: SCDisplay, scale: CGFloat, islandFrame: CGRect?, number: Int) {
         let displayID = display.displayID
         let group = DispatchGroup()
         var screenImage: CGImage?
@@ -198,14 +215,14 @@ final class Snapshotter {
             guard let image = screenImage ?? filteredImage else {
                 // The display and window lists can be stale after a display change.
                 self.displays[displayID] = nil
-                self.finish(displayID, nil)
+                self.finish(displayID, nil, number)
                 return
             }
             var snapshot = Snapshot(image: image)
             if screenImage != nil, let filteredImage, let islandFrame {
                 Self.addPatch(to: &snapshot, from: filteredImage, islandFrame: islandFrame, scale: scale)
             }
-            self.finish(displayID, snapshot)
+            self.finish(displayID, snapshot, number)
         }
     }
 
@@ -263,7 +280,7 @@ final class Snapshotter {
 
     // MARK: - Capture below the Dock
 
-    private static let captureQueue = DispatchQueue(label: "com.cnrad.interspace.capture", qos: .userInteractive)
+    private static let captureQueue = DispatchQueue(label: "com.cnrad.interspace.capture", qos: .userInteractive, autoreleaseFrequency: .workItem)
     private static let dockBundleID = "com.apple.dock"
     private static let dockWindowLayer = Int(CGWindowLevelForKey(.dockWindow))
 
@@ -308,7 +325,7 @@ final class Snapshotter {
         return onDisplay ?? anywhere
     }
 
-    private static let sampleQueue = DispatchQueue(label: "com.cnrad.interspace.sample", qos: .userInteractive)
+    private static let sampleQueue = DispatchQueue(label: "com.cnrad.interspace.sample", qos: .userInteractive, autoreleaseFrequency: .workItem)
     private static let sampleWidth = 96
     private static let sampleHeight = 60
 
@@ -399,7 +416,9 @@ final class Snapshotter {
         }
     }
 
-    private func finish(_ displayID: CGDirectDisplayID, _ snapshot: Snapshot?) {
+    private func finish(_ displayID: CGDirectDisplayID, _ snapshot: Snapshot?, _ number: Int) {
+        guard running[displayID] == number else { return }
+        running[displayID] = nil
         let callbacks = waiters.removeValue(forKey: displayID) ?? []
         for callback in callbacks {
             callback(snapshot)
@@ -428,7 +447,7 @@ final class Snapshotter {
         let height: Int
     }
 
-    private static let wallpaperQueue = DispatchQueue(label: "com.cnrad.interspace.wallpaper", qos: .userInitiated)
+    private static let wallpaperQueue = DispatchQueue(label: "com.cnrad.interspace.wallpaper", qos: .userInitiated, autoreleaseFrequency: .workItem)
 
     private static func wallpaperRequest(for screen: NSScreen) -> WallpaperRequest? {
         guard let url = NSWorkspace.shared.desktopImageURL(for: screen) else { return nil }
