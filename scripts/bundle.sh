@@ -1,15 +1,23 @@
 #!/bin/bash
 # Builds Interspace and packages it as build/Interspace.app.
+#
+#   scripts/bundle.sh               for this Mac only
+#   scripts/bundle.sh --universal   for Apple silicon and Intel, as a release needs
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-swift build -c release
+BUILD_ARGS=(-c release)
+if [ "${1:-}" = "--universal" ]; then
+    BUILD_ARGS+=(--arch arm64 --arch x86_64)
+fi
+
+swift build "${BUILD_ARGS[@]}"
 
 APP="build/Interspace.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp "$(swift build -c release --show-bin-path)/Interspace" "$APP/Contents/MacOS/Interspace"
+cp "$(swift build "${BUILD_ARGS[@]}" --show-bin-path)/Interspace" "$APP/Contents/MacOS/Interspace"
 cp Info.plist "$APP/Contents/Info.plist"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 

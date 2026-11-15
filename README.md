@@ -11,17 +11,20 @@ Interspace is a small app that replaces that transition with one you choose, or 
 
 ## Install
 
-Interspace is built on your Mac from this source. You need macOS 14 or newer and the Xcode Command Line Tools (the installer asks for them if they are missing).
+You need macOS 14 or newer. The app runs on Apple silicon and Intel.
 
-```sh
-curl -fsSL https://raw.githubusercontent.com/cnrad/interspace/main/scripts/install.sh | bash
-```
+1. Download [Interspace.dmg](https://github.com/cnrad/interspace/releases/latest/download/Interspace.dmg).
+2. Open it and drag Interspace to Applications.
+3. Open Interspace from Applications. macOS stops it, because the app is not notarized by Apple. Click **Done**.
+4. Open System Settings > Privacy & Security, scroll down to Security, and click **Open Anyway** next to the message about Interspace. Confirm with your password or Touch ID.
 
-Or ask your coding agent:
+Steps 3 and 4 are necessary one time only.
 
-> Install Interspace from https://github.com/cnrad/interspace. Clone it, read `scripts/install.sh` before you run it, then run it. When it finishes, tell me which two permissions to turn on in System Settings and where.
+### Update
 
-The script gets the source into `~/.interspace`, builds it, makes a signing identity for your Mac, and puts `Interspace.app` in `/Applications`. Run the same command again to update.
+Choose **Check for Updates…** in the menu bar menu. If there is a newer release, Interspace downloads it, installs it in the place of the old one, and opens again. Your permissions and settings stay.
+
+Interspace installs a download only if it has the same signature as the releases of this project and a newer version. If not, it changes nothing.
 
 ### Permissions
 
@@ -34,13 +37,29 @@ Only you can do this part. Allow Interspace in System Settings > Privacy & Secur
 
 Then choose **Relaunch Interspace** in its menu bar menu. Until both are allowed, Interspace does nothing and the normal macOS swipe works as before.
 
-Interspace sends nothing off your Mac. It has no network code.
+Interspace sends nothing about you off your Mac. The only time it uses the network is when you choose **Check for Updates…**: it asks GitHub for the newest release, and downloads it if you agree.
 
 ### Uninstall
 
 ```sh
-~/.interspace/scripts/uninstall.sh
+curl -fsSL https://raw.githubusercontent.com/cnrad/interspace/main/scripts/uninstall.sh | bash
 ```
+
+This removes the app, its login item, its two permissions and its settings.
+
+### Build it from source
+
+If you do not want to run a downloaded app, build it on your Mac. An app that is built on the Mac it runs on is not stopped by Gatekeeper, so steps 3 and 4 above are not necessary. You need the Xcode Command Line Tools (the installer asks for them if they are missing).
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/cnrad/interspace/main/scripts/install.sh | bash
+```
+
+Or ask your coding agent:
+
+> Install Interspace from https://github.com/cnrad/interspace. Clone it, read `scripts/install.sh` before you run it, then run it. When it finishes, tell me which two permissions to turn on in System Settings and where.
+
+The script gets the source into `~/.interspace`, builds it, makes a signing identity for your Mac, and puts `Interspace.app` in `/Applications`. Run the same command again to update: **Check for Updates…** tells you when there is a newer version, but a copy that you built has the signature of your Mac, so it does not replace itself with a download. The two permissions are the same as above.
 
 ## Transitions
 
@@ -76,7 +95,7 @@ Quit Interspace and the normal macOS behaviour is back at once.
 ## Limits
 
 - **Private macOS behaviour.** The trackpad data, the synthetic swipe, the list of spaces and one of the screen captures are not public API. A macOS update can break any of them. It is developed and tested on macOS 27 only.
-- **No Mac App Store, no notarized download.** That is why it is built from source.
+- **No Mac App Store, not notarized.** That is why macOS stops the downloaded app the first time, and you must allow it in Privacy & Security.
 - **A short screen freeze at launch.** macOS only draws the active space, so Interspace visits each space once behind a frozen picture to capture it. It takes about a second.
 - **A new desktop** shows your wallpaper the first time you swipe to it. Use **Capture All Spaces Again** in the menu to avoid that.
 - **Mission Control.** A swipe while Mission Control is open is not handled well.
@@ -87,7 +106,12 @@ Quit Interspace and the normal macOS behaviour is back at once.
 ```sh
 scripts/setup-signing.sh   # one time: a local signing identity, so permissions survive rebuilds
 scripts/bundle.sh          # builds build/Interspace.app
+scripts/dmg.sh             # builds build/Interspace.dmg, the universal download of a release
 ```
+
+A release is `build/Interspace.dmg`, attached to a GitHub release with that exact file name. Each release must be signed with the same identity, or everyone must allow the two permissions again after an update. The app also refuses an update with a different signature: the one it accepts is in `Updater.swift`, and `scripts/dmg.sh` stops if the build does not have it. So keep a copy of `~/Library/Keychains/interspace-signing.keychain-db` and `~/.config/interspace/signing-keychain-password`.
+
+The tag of a release is the version in `Info.plist` with a `v` in front, for example `v0.2.0`. The app compares the two to know if a release is newer.
 
 Every tuning value is in `Sources/Interspace/Config.swift`. The math of each transition is in `TransitionMath.swift`, and both the real transition and its preview in the settings window use it.
 
