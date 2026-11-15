@@ -15,6 +15,9 @@ You need macOS 14 or newer. The app runs on Apple silicon and Intel.
 
 1. Download [Interspace.dmg](https://github.com/cnrad/interspace/releases/latest/download/Interspace.dmg).
 2. Open it and drag Interspace to Applications.
+   - macOS blocks opening the app, because it is downloaded from the web and not notarized by Apple. Click **Open Anyway** in System Settings > Privacy & Security.
+
+     <img src="assets/open-anyway.webp" width="600" alt="The Open Anyway button next to the message about Interspace.dmg in Privacy & Security">
 3. Open Interspace from Applications. macOS stops it, because the app is not notarized by Apple. Click **Done**.
 4. Open System Settings > Privacy & Security, scroll down to Security, and click **Open Anyway** next to the message about Interspace. Confirm with your password or Touch ID.
 
