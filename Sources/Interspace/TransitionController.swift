@@ -571,6 +571,13 @@ final class TransitionController {
         dockIndex += target
         dockPostTime = CACurrentMediaTime()
         lastSwitch = (layout.displayUUID, layout.spaceIDs, dockIndex, dockPostTime)
+        // After the Dock has drawn the new desktop, and before an app that took the focus can pull it away.
+        let landing = layout.spaceIDs[dockIndex]
+        for delay in Config.focusAfterSwitchDelays {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                Self.focusTopWindow(onSpace: landing)
+            }
+        }
         return true
     }
 
@@ -950,6 +957,33 @@ final class TransitionController {
     }
 
     /// True when the Dock shows the space at `index`. Also true when that cannot be known.
+    /// After a switch with no animation, macOS can give the focus to a floating window that is on every
+    /// desktop. Its app is then activated and brings its own window forward on another desktop, and the
+    /// Dock follows it there. Gives the focus to the app of the top normal window here instead, as the
+    /// macOS transition does.
+    /// Only windows that live on `space` alone count: a window on every desktop is what took the focus,
+    /// and the on-screen list can still show the desktop that was left.
+    static func focusTopWindow(onSpace space: UInt64) {
+        // Front to back, every desktop.
+        guard let windows = CGWindowListCopyWindowInfo([.optionAll, .excludeDesktopElements], kCGNullWindowID)
+            as? [[String: Any]] else { return }
+        let ownPID = ProcessInfo.processInfo.processIdentifier
+        let top = windows.first { info in
+            guard (info[kCGWindowLayer as String] as? Int) == 0,
+                  (info[kCGWindowAlpha as String] as? Double ?? 1) > 0,
+                  let owner = info[kCGWindowOwnerPID as String] as? pid_t, owner != ownPID,
+                  let number = info[kCGWindowNumber as String] as? Int
+            else { return false }
+            return Spaces.spaces(ofWindow: number) == [space]
+        }
+        guard let pid = top?[kCGWindowOwnerPID as String] as? pid_t,
+              let app = NSRunningApplication(processIdentifier: pid),
+              NSWorkspace.shared.frontmostApplication?.processIdentifier != pid
+        else { return }
+        log.notice("focus to \(app.bundleIdentifier ?? "?", privacy: .public) from \(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "?", privacy: .public)")
+        app.activate()
+    }
+
     private func dockIsOn(_ index: Int) -> Bool {
         guard let layout, layout.spaceIDs.indices.contains(index),
               let live = Spaces.layout(for: layout.screen)

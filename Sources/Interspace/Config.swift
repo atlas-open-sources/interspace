@@ -18,6 +18,14 @@ enum Config {
     /// Maximum travel past the first or last space.
     static let edgeRubberBand: CGFloat = 0.12
 
+    // MARK: Focus
+
+    /// Seconds after a switch at which the app of the top window on the new desktop gets the focus.
+    /// macOS can give it to a floating window that is on every desktop instead; that window's app
+    /// then pulls its own window forward on another desktop about 0.2 s later, and the Dock follows.
+    /// Both times aim at the desktop being landed on, so neither can move away from it.
+    static let focusAfterSwitchDelays: [Double] = [0, 0.15]
+
     // MARK: Snap animation
 
     /// Spring response in seconds for the snap after release, at speed 1 in the settings. Lower is faster.
